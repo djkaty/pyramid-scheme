@@ -1,5 +1,4 @@
 import numpy as np
-from scipy import ndimage
 import cv2
 
 INTERNAL_DTYP = np.float32
@@ -11,7 +10,7 @@ def generating_kernel(a):
 
 
 def convolve(image, kernel=generating_kernel(0.4)):
-    return ndimage.convolve(image.astype(INTERNAL_DTYP), kernel, mode="mirror")
+    return cv2.filter2D(image, -1, kernel, None, borderType=cv2.BORDER_REFLECT_101)
 
 
 def gaussian_pyramid(images, levels):
