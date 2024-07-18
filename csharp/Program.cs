@@ -1,8 +1,3 @@
-using System;
-using System.IO;
-using System.Linq;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using OpenCvSharp;
 
 public class ImageStacking
@@ -21,13 +16,13 @@ public class ImageStacking
         Mat mean = new Mat(), stddev = new Mat();
         Cv2.MeanStdDev(laplacian, mean, stddev);
 
-        double stdDevValue = stddev.At<double>(0, 0) / 25.0;
+        double stdDevValue = stddev.Get<double>(0, 0) / 25.0;
         return stdDevValue * stdDevValue;
     }
 
     private static List<Mat> StackFilter(List<Mat> images, double threshold)
     {
-        List<double> focus = images.Select(ComputeFv).ToList();
+        List<double> focus = images.Select(i => ComputeFv(i)).ToList();
         Console.WriteLine(string.Join(" ", focus.Select(f => f.ToString("F2"))));
 
         int maxIndex = focus.IndexOf(focus.Max());
@@ -50,7 +45,7 @@ public class ImageStacking
         return PyramidFusion.GetPyramidFusion(images.ToArray());
     }
 
-    private static void StackDir(string dirPath, string outDirPath = null, bool overwrite = false)
+    private static void StackDir(string dirPath, string? outDirPath = null, bool overwrite = false)
     {
         string dest = outDirPath == null ? $"{dirPath}.jpg" : Path.Combine(outDirPath, Path.GetFileName(dirPath) + ".jpg");
 
@@ -72,14 +67,14 @@ public class ImageStacking
     public static async Task Main(string[] args)
     {
         string inputSpec = args[0];
-        string outDirPath = args.Length > 1 ? args[1] : null;
+        string? outDirPath = args.Length > 1 ? args[1] : null;
 
         if (inputSpec.Contains('*'))
         {
             int processes = args.Length > 2 ? int.Parse(args[2]) : 4;
 
             List<Task> tasks = new List<Task>();
-            foreach (string dirPath in Directory.GetDirectories(Path.GetDirectoryName(inputSpec), Path.GetFileName(inputSpec)))
+            foreach (string dirPath in Directory.GetDirectories(Path.GetDirectoryName(inputSpec) ?? ".", Path.GetFileName(inputSpec)))
             {
                 if (Directory.Exists(dirPath))
                 {
