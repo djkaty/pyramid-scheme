@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using OpenCvSharp;
 
 public class ImageStacking
@@ -66,6 +67,14 @@ public class ImageStacking
 
     public static async Task Main(string[] args)
     {
+        var timer = new Stopwatch();
+        timer.Start();
+
+        if (args.Length == 0) {
+            Console.WriteLine("Supply a file path for the input as the first argument.");
+            return;
+        }
+
         string inputSpec = args[0];
         string? outDirPath = args.Length > 1 ? args[1] : null;
 
@@ -88,5 +97,9 @@ public class ImageStacking
         {
             StackDir(inputSpec, outDirPath, true);
         }
+
+        timer.Stop();
+        TimeSpan timeTaken = timer.Elapsed;
+        Console.WriteLine($"Elapsed time: {timeTaken:s\\.fff} seconds");
     }
 }
