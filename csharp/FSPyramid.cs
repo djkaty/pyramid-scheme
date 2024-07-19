@@ -211,19 +211,21 @@ public class PyramidFusion
     }
 
     public static Mat GetFusedLaplacianChannel(Mat[] laplacians, int channel) {
-        var regionEnergies = new Mat[laplacians.Length];
+        var regionEnergies = new Mat<float>[laplacians.Length];
 
         for (int layer = 0; layer < laplacians.Length; layer++) {
             var greyLap = laplacians[layer].ExtractChannel(channel);
-            regionEnergies[layer] = RegionEnergy(greyLap);
+            regionEnergies[layer] = new Mat<float>(RegionEnergy(greyLap));
         }
 
         (int width, int height) = laplacians[0].Size();
 
+        var indexers = regionEnergies.Select((regionEnergy) => regionEnergy.GetIndexer()).ToList();
+
         var bestRE = new int[height, width];
         for (var y = 0; y < laplacians[0].Height; y++) {
             for (var x = 0; x < laplacians[0].Width; x++) {
-                var best_re = Enumerable.Range(0, laplacians.Length).MaxBy(imageIndex => regionEnergies[imageIndex].Get<float>(y, x));
+                var best_re = Enumerable.Range(0, laplacians.Length).MaxBy(imageIndex => indexers[imageIndex][y, x]);
                 bestRE[y, x] = best_re;
             }
         }
