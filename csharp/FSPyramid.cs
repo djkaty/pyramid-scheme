@@ -1,7 +1,4 @@
-﻿using System;
-using System.Linq;
-using NumSharp.Extensions;
-using OpenCvSharp;
+﻿using OpenCvSharp;
 
 public class PyramidFusion
 {
@@ -51,23 +48,25 @@ public class PyramidFusion
     public static Mat[][] LaplacianPyramid(Mat[] images, int levels)
     {
         var gaussian = GaussianPyramid(images, levels);
-        var pyramid = new Mat[levels][];
-        pyramid[pyramid.Length - 1] = gaussian[gaussian.Length - 1];
+        var pyramid = new Mat[gaussian.Length][];
+        pyramid[gaussian.Length - 1] = gaussian[gaussian.Length - 1];
 
-        for (int level = levels - 1; level > 0; level--)
+        for (int level = gaussian.Length - 1; level > 0; level--)
         {
+            var gauss = gaussian[level - 1];
             Mat[] levelArray = new Mat[images.Length];
             for (int layer = 0; layer < images.Length; layer++)
             {
+                var gauss_layer = gauss[layer];
                 Mat expanded = new Mat();
                 Cv2.PyrUp(gaussian[level][layer], expanded);
 
-                if (expanded.Size() != gaussian[level - 1][layer].Size())
+                if (expanded.Size() != gauss_layer.Size())
                 {
-                    expanded = expanded[0, gaussian[level - 1][layer].Rows, 0, gaussian[level][layer].Cols];
+                    expanded = expanded[0, gauss_layer.Rows, 0, gauss_layer.Cols];
                 }
 
-                levelArray[layer] = gaussian[level - 1][layer] - expanded;
+                levelArray[layer] = gauss_layer - expanded;
             }
             pyramid[level - 1] = levelArray;
         }
@@ -152,7 +151,7 @@ public class PyramidFusion
             deviations[layer] = result.Item2;
         }
 
-        (int height, int width) = images[0].Size();
+        (int width, int height) = images[0].Size();
 
         var best_e = new int[height, width];
         var best_d = new int[height, width];
@@ -166,27 +165,36 @@ public class PyramidFusion
             }
         }
 
-        var fused = new float[height, width, images[0].Channels()];
+        var fused = new float[height, width];
 
         for (int i = 0; i < images.Length; i++)
         {
             for (int y = 0; y < height; y++) {
                 for (int x = 0; x < width; x++) {
-                    fused[y, x, channel] += best_e[y, x] == i ? images[i].Get<float>(y, x, channel) / 2 : 0;
-                    fused[y, x, channel] += best_d[y, x] == i ? images[i].Get<float>(y, x, channel) / 2 : 0;
+                    fused[y, x] += best_e[y, x] == i ? images[i].Get<Vec3f>(y, x)[channel] / 2 : 0;
+                    fused[y, x] += best_d[y, x] == i ? images[i].Get<Vec3f>(y, x)[channel] / 2 : 0;
                 }
             }
         }
-        var fusedMat = Mat.FromPixelData([height, width, images[0].Channels()], MatType.CV_32FC3, fused);
+
+        var fusedRounded = new byte[height, width];
+        for (int i = 0; i < height; i++) {
+            for (int j = 0; j < width; j++) {
+                fusedRounded[i, j] = (byte)fused[i, j]; // No: convert, don't cast
+            }
+        }
+        var fusedMat = Mat.FromArray(fusedRounded);
+
         return fusedMat;
     }
 
     public static Mat GetFusedBase(Mat[] images, int kernelSize)
     {
         Mat fused = new Mat(images[0].Size(), images[0].Type());
+
         for (int channel = 0; channel < images[0].Channels(); channel++)
         {
-            fused.Add(GetFusedBaseChannel(images, kernelSize, channel));
+            GetFusedBaseChannel(images, kernelSize, channel).InsertChannel(fused, channel);
         }
         return fused;
     }
@@ -210,7 +218,7 @@ public class PyramidFusion
             regionEnergies[layer] = RegionEnergy(greyLap);
         }
 
-        (int height, int width) = laplacians[0].Size();
+        (int width, int height) = laplacians[0].Size();
 
         var bestRE = new int[height, width];
         for (var y = 0; y < laplacians[0].Height; y++) {
@@ -226,18 +234,26 @@ public class PyramidFusion
         {
             for (int y = 0; y < height; y++) {
                 for (int x = 0; x < width; x++) {
-                    fused[y, x] += bestRE[y, x] == i ? laplacians[i].Get<float>(y, x, channel) : 0;
+                    fused[y, x] += bestRE[y, x] == i ? laplacians[i].Get<Vec3f>(y, x)[channel] : 0;
                 }
             }
         }
-        var fusedMat = Mat.FromPixelData([height, width], MatType.CV_32FC2, fused);
+
+        var fusedRounded = new byte[height, width];
+        for (int i = 0; i < height; i++) {
+            for (int j = 0; j < width; j++) {
+                fusedRounded[i, j] = (byte)fused[i, j]; // No: convert, don't cast
+            }
+        }
+        var fusedMat = Mat.FromArray(fusedRounded);
+
         return fusedMat;
     }
 
     public static Mat GetFusedLaplacian(Mat[] laplacians) {
         Mat fused = new Mat(laplacians[0].Size(), laplacians[0].Type());
         for (int channel = 0; channel < laplacians[0].Channels(); channel++) {
-            fused.InsertChannel(GetFusedLaplacianChannel(laplacians, channel), channel);
+            GetFusedLaplacianChannel(laplacians, channel).InsertChannel(fused, channel);
         }
         return fused;
     }
