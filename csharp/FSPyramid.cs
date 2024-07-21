@@ -172,13 +172,10 @@ public class PyramidFusion
 
         var fused = new float[height, width];
 
-        for (int i = 0; i < images.Length; i++)
-        {
-            for (int y = 0; y < height; y++) {
-                for (int x = 0; x < width; x++) {
-                    fused[y, x] += best_e[y, x] == i ? images[i].Get<Vec3f>(y, x)[channel] / 2 : 0;
-                    fused[y, x] += best_d[y, x] == i ? images[i].Get<Vec3f>(y, x)[channel] / 2 : 0;
-                }
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                fused[y, x] += images[best_e[y, x]].Get<Vec3f>(y, x)[channel] / 2;
+                fused[y, x] += images[best_d[y, x]].Get<Vec3f>(y, x)[channel] / 2;
             }
         }
 
@@ -210,33 +207,29 @@ public class PyramidFusion
     }
 
     public static Mat GetFusedLaplacianChannel(Mat[] laplacians, int channel) {
-        var regionEnergies = new Mat[laplacians.Length];
+        var regionEnergies = new float[laplacians.Length][,];
 
         for (int layer = 0; layer < laplacians.Length; layer++) {
             var greyLap = laplacians[layer].ExtractChannel(channel);
-            regionEnergies[layer] = RegionEnergy(greyLap);
+            RegionEnergy(greyLap).GetRectangularArray(out regionEnergies[layer]);
         }
 
         (int width, int height) = laplacians[0].Size();
 
-        var indexers = regionEnergies.Select((regionEnergy) => regionEnergy.GetGenericIndexer<float>()).ToList();
-
         var bestRE = new int[height, width];
         for (var y = 0; y < laplacians[0].Height; y++) {
             for (var x = 0; x < laplacians[0].Width; x++) {
-                var best_re = Enumerable.Range(0, laplacians.Length).MaxBy(imageIndex => indexers[imageIndex][y, x]);
+                var best_re = Enumerable.Range(0, laplacians.Length).MaxBy(imageIndex => regionEnergies[imageIndex][y, x]);
                 bestRE[y, x] = best_re;
             }
         }
 
         var fused = new float[height, width];
 
-        for (int i = 0; i < laplacians.Length; i++)
-        {
-            for (int y = 0; y < height; y++) {
-                for (int x = 0; x < width; x++) {
-                    fused[y, x] += bestRE[y, x] == i ? laplacians[i].Get<Vec3f>(y, x)[channel] : 0;
-                }
+        var laplacianIndexers = laplacians.Select((laplacian) => new Mat<Vec3f>(laplacian).GetIndexer()).ToList();
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                fused[y, x] = laplacianIndexers[bestRE[y, x]][y, x][channel];
             }
         }
 
