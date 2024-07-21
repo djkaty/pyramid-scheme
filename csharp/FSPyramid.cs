@@ -200,23 +200,23 @@ public class PyramidFusion
 
     public static Mat<float> GetPixelsFromBestRegionEnergies(Mat[] laplacians, int channel) {
         (int width, int height) = laplacians[0].Size();
-        var bestRE = new float[height, width];
-        var bestPixel = new float[height, width];
+        var bestRE = new float[height * width];
+        var bestPixel = new float[height * width];
 
         for (int layer = 0; layer < laplacians.Length; layer++) {
-            laplacians[layer].GetRectangularArray(out Vec3f[,] layerArray);
             var grey = laplacians[layer].ExtractChannel(channel);
-            RegionEnergy(grey).GetRectangularArray(out float[,] regionEnergies);
+            grey.GetArray(out float[] singleChannel);
+            RegionEnergy(grey).GetArray(out float[] regionEnergies);
             for (int y = 0; y < height; y++) {
                 for (int x = 0; x < width; x++) {
-                    if (regionEnergies[y, x] > bestRE[y, x]) {
-                        bestRE[y, x] = regionEnergies[y, x];
-                        bestPixel[y, x] = layerArray[y, x][channel];
+                    if (regionEnergies[y * height + x] > bestRE[y * height + x]) {
+                        bestRE[y * height + x] = regionEnergies[y * height + x];
+                        bestPixel[y * height + x] = singleChannel[y * height + x];
                     }
                 }
             }
         }
-        return Mat.FromArray(bestPixel);
+        return Mat.FromArray(bestPixel).Reshape(height, width);
     }
 
     public static Mat GetFusedLaplacian(Mat[] laplacians) {
