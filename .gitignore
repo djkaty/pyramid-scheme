@@ -1,6 +1,8 @@
-/*.jpg
 __pycache__
+*.jpg
+*.png
 obj/
 bin/
 .vs/
 python-results/
+*.diagsession
