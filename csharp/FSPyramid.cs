@@ -207,12 +207,10 @@ public class PyramidFusion
             var grey = laplacians[layer].ExtractChannel(channel);
             grey.GetArray(out float[] singleChannel);
             RegionEnergy(grey).GetArray(out float[] regionEnergies);
-            for (int y = 0; y < height; y++) {
-                for (int x = 0; x < width; x++) {
-                    if (regionEnergies[y * height + x] > bestRE[y * height + x]) {
-                        bestRE[y * height + x] = regionEnergies[y * height + x];
-                        bestPixel[y * height + x] = singleChannel[y * height + x];
-                    }
+            for (int i = 0; i < height * width; i++) {
+                if (regionEnergies[i] > bestRE[i]) {
+                    bestRE[i] = regionEnergies[i];
+                    bestPixel[i] = singleChannel[i];
                 }
             }
         }
