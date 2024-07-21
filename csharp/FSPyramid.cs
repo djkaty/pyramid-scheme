@@ -116,14 +116,13 @@ public class PyramidFusion
         return probabilities;
     }
 
-    public static Tuple<Mat, Mat> EntropyDeviation(Mat image, int kernelSize)
+    public static Mat Deviation(Mat image, int kernelSize)
     {
         var probabilities = GetProbabilities(image);
         int padAmount = (kernelSize - 1) / 2;
         Mat paddedImage = new Mat();
         Cv2.CopyMakeBorder(image, paddedImage, padAmount, padAmount, padAmount, padAmount, BorderTypes.Reflect101);
 
-        Mat entropies = new Mat(image.Size(), MatType.CV_32F);
         Mat deviations = new Mat(image.Size(), MatType.CV_32F);
 
         for (int row = 0; row < image.Rows; row++)
@@ -132,7 +131,6 @@ public class PyramidFusion
             {
                 Mat area = paddedImage.SubMat(row, row + kernelSize, column, column + kernelSize);
                 area.GetArray(out float[] areaFloats);
-                entropies.Set<float>(row, column, -areaFloats.Sum(f => f * MathF.Log(probabilities[f])));
                 var average = areaFloats.Average();
                 var deviation = areaFloats.Sum(x => Math.Pow(x - average, 2)) / areaFloats.Length;
 
@@ -140,7 +138,7 @@ public class PyramidFusion
             }
         }
 
-        return Tuple.Create(entropies, deviations);
+        return deviations;
     }
 
     public static Mat GetFusedBaseChannel(Mat[] images, int kernelSize, int channel)
@@ -151,21 +149,16 @@ public class PyramidFusion
         for (int layer = 0; layer < images.Length; layer++)
         {
             var grayImage = images[layer].ExtractChannel(channel);
-            var result = EntropyDeviation(grayImage, kernelSize);
-            entropies[layer] = result.Item1;
-            deviations[layer] = result.Item2;
+            deviations[layer] = Deviation(grayImage, kernelSize);
         }
 
         (int width, int height) = images[0].Size();
 
-        var best_e = new int[height, width];
         var best_d = new int[height, width];
 
         for (var y = 0; y < images[0].Height; y++) {
             for (var x = 0; x < images[0].Width; x++) {
-                var bestE = Enumerable.Range(0, images.Length).MaxBy(imageIndex => entropies[imageIndex].Get<float>(y, x));
                 var bestD = Enumerable.Range(0, images.Length).MaxBy(imageIndex => deviations[imageIndex].Get<float>(y, x));
-                best_e[y, x] = bestE;
                 best_d[y, x] = bestD;
             }
         }
@@ -174,8 +167,7 @@ public class PyramidFusion
 
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
-                fused[y, x] += images[best_e[y, x]].Get<Vec3f>(y, x)[channel] / 2;
-                fused[y, x] += images[best_d[y, x]].Get<Vec3f>(y, x)[channel] / 2;
+                fused[y, x] = images[best_d[y, x]].Get<Vec3f>(y, x)[channel];
             }
         }
 
