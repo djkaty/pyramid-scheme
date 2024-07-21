@@ -125,16 +125,43 @@ public class PyramidFusion
 
         Mat deviations = new Mat(image.Size(), MatType.CV_32F);
 
+        var avgQueue = new Queue<float>(kernelSize);
         for (int row = 0; row < image.Rows; row++)
         {
+            var avgSum = 0f;
+
             for (int column = 0; column < image.Cols; column++)
             {
                 Mat area = paddedImage.SubMat(row, row + kernelSize, column, column + kernelSize);
                 area.GetArray(out float[] areaFloats);
-                var average = areaFloats.Average();
-                var deviation = areaFloats.Sum(x => Math.Pow(x - average, 2)) / areaFloats.Length;
+                if (column == 0) {
+                    avgQueue.Clear();
+                    for (int i = 0; i < areaFloats.Length / kernelSize; i++) {
+                        var a = 0f;
+                        for (int j = 0; j < kernelSize; j++)
+                        {
+                            a += areaFloats[i * kernelSize + j];
+                        }
+                        avgSum += a;
+                        avgQueue.Enqueue(a);
+                    }
+                } else {
+                    avgSum -= avgQueue.Dequeue();
+                    var a = 0f;
+                    for (int j = 0; j < kernelSize; j++) {
+                        a += areaFloats[(kernelSize - 1) * kernelSize + j];
+                    }
+                    avgSum += a;
+                    avgQueue.Enqueue(a);
+                }
+                var average = avgSum / areaFloats.Length;
+                var sum = 0f;
+                for (int i = 0; i < areaFloats.Length; i++) {
+                    sum += (areaFloats[i] - average) * (areaFloats[i] - average);
+                }
+                var deviation = sum / areaFloats.Length;
 
-                deviations.Set<float>(row, column, (float) deviation);
+                deviations.Set(row, column, deviation);
             }
         }
 
