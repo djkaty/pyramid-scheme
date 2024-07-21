@@ -96,29 +96,8 @@ public class PyramidFusion
         return image;
     }
 
-    public static Dictionary<float, float> GetProbabilities(Mat grayImage)
-    {
-        var histogram = new Dictionary<float, int>();
-
-        grayImage.GetArray(out float[] grayImageBytes);
-
-        foreach (var pixel in grayImageBytes) {
-            histogram[pixel] = histogram.ContainsKey(pixel) ? histogram[pixel] + 1 : 1;
-        }
-
-        float totalPixels = grayImage.Rows * grayImage.Cols;
-        var probabilities = new Dictionary<float, float>();
-        foreach (var (level, count) in histogram)
-        {
-            probabilities[level] = count / totalPixels;
-        }
-
-        return probabilities;
-    }
-
     public static Mat Deviation(Mat image, int kernelSize)
     {
-        var probabilities = GetProbabilities(image);
         int padAmount = (kernelSize - 1) / 2;
         Mat paddedImage = new Mat();
         Cv2.CopyMakeBorder(image, paddedImage, padAmount, padAmount, padAmount, padAmount, BorderTypes.Reflect101);
