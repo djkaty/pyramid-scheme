@@ -198,53 +198,35 @@ public class PyramidFusion
         return fused;
     }
 
-    public static int[,] GetBestRegionEnergies(Mat[] laplacians, int channel) {
+    public static Mat<float> GetPixelsFromBestRegionEnergies(Mat[] laplacians, int channel) {
         (int width, int height) = laplacians[0].Size();
         var bestRE = new float[height, width];
-        var bestREindex = new int[height, width];
+        var bestPixel = new float[height, width];
 
         for (int layer = 0; layer < laplacians.Length; layer++) {
+            laplacians[layer].GetRectangularArray(out Vec3f[,] layerArray);
             var grey = laplacians[layer].ExtractChannel(channel);
             RegionEnergy(grey).GetRectangularArray(out float[,] regionEnergies);
             for (int y = 0; y < height; y++) {
                 for (int x = 0; x < width; x++) {
                     if (regionEnergies[y, x] > bestRE[y, x]) {
                         bestRE[y, x] = regionEnergies[y, x];
-                        bestREindex[y, x] = layer;
+                        bestPixel[y, x] = layerArray[y, x][channel];
                     }
                 }
             }
         }
-        return bestREindex;
-    }
-
-    public static Mat GetFusedLaplacianChannel(Mat[] laplacians, int channel) {
-
-        (int width, int height) = laplacians[0].Size();
-
-        var bestRE = GetBestRegionEnergies(laplacians, channel);
-
-        var fused = new float[height, width];
-
-        var lapArrays = new Vec3f[laplacians.Length][,];
-        for (int i = 0; i < laplacians.Length; i++) {
-            laplacians[i].GetRectangularArray(out lapArrays[i]);
-        }
-
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
-                fused[y, x] = lapArrays[bestRE[y, x]][y, x][channel];
-            }
-        }
-
-        var fusedMat = Mat.FromArray(fused);
-        return fusedMat;
+        return Mat.FromArray(bestPixel);
     }
 
     public static Mat GetFusedLaplacian(Mat[] laplacians) {
-        Mat fused = new Mat(laplacians[0].Size(), laplacians[0].Type());
-        for (int channel = 0; channel < laplacians[0].Channels(); channel++) {
-            GetFusedLaplacianChannel(laplacians, channel).InsertChannel(fused, channel);
+        (int width, int height) = laplacians[0].Size();
+        int channels = laplacians[0].Channels(); // should always be 3
+
+        var fused = new Mat<Vec3f>(height, width);
+        for (int channel = 0; channel < channels; channel++) {
+            var bestREPixels = GetPixelsFromBestRegionEnergies(laplacians, channel);
+            bestREPixels.InsertChannel(fused, channel);
         }
         return fused;
     }
