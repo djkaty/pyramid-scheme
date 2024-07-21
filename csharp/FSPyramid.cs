@@ -29,6 +29,10 @@ public class PyramidFusion
     public static Mat[][] GaussianPyramid(Mat[] images, int levels)
     {
         var pyramid = new Mat[levels + 1][];
+
+        for (int i = 0; i < images.Length; i++) {
+            images[i].ConvertTo(images[i], MatType.CV_32FC3);
+        }
         pyramid[0] = images;
 
         for (int i = 1; i <= levels; i++)
@@ -92,20 +96,21 @@ public class PyramidFusion
         return image;
     }
 
-    public static float[] GetProbabilities(Mat grayImage)
+    public static Dictionary<float, float> GetProbabilities(Mat grayImage)
     {
-        var histogram = new int[256];
-        var grayImageBytes = grayImage.ToBytes();
+        var histogram = new Dictionary<float, int>();
+
+        grayImage.GetArray(out float[] grayImageBytes);
 
         foreach (var pixel in grayImageBytes) {
-            histogram[pixel]++;
+            histogram[pixel] = histogram.ContainsKey(pixel) ? histogram[pixel] + 1 : 1;
         }
 
         float totalPixels = grayImage.Rows * grayImage.Cols;
-        var probabilities = new float[256];
-        for (int i = 0; i < 256; i++)
+        var probabilities = new Dictionary<float, float>();
+        foreach (var (level, count) in histogram)
         {
-            probabilities[i] = histogram[i] / totalPixels;
+            probabilities[level] = count / totalPixels;
         }
 
         return probabilities;
@@ -113,7 +118,7 @@ public class PyramidFusion
 
     public static Tuple<Mat, Mat> EntropyDeviation(Mat image, int kernelSize)
     {
-        float[] probabilities = GetProbabilities(image);
+        var probabilities = GetProbabilities(image);
         int padAmount = (kernelSize - 1) / 2;
         Mat paddedImage = new Mat();
         Cv2.CopyMakeBorder(image, paddedImage, padAmount, padAmount, padAmount, padAmount, BorderTypes.Reflect101);
@@ -126,10 +131,10 @@ public class PyramidFusion
             for (int column = 0; column < image.Cols; column++)
             {
                 Mat area = paddedImage.SubMat(row, row + kernelSize, column, column + kernelSize);
-                entropies.Set<float>(row, column, -area.ToBytes().Sum(b => probabilities[b] * MathF.Log(probabilities[b])));
-                var areaData = Array.ConvertAll(area.ToBytes(), Convert.ToDouble);
-                var average = areaData.Average();
-                var deviation = areaData.Sum(x => Math.Pow(x - average, 2)) / areaData.Length;
+                area.GetArray(out float[] areaFloats);
+                entropies.Set<float>(row, column, -areaFloats.Sum(f => f * MathF.Log(probabilities[f])));
+                var average = areaFloats.Average();
+                var deviation = areaFloats.Sum(x => Math.Pow(x - average, 2)) / areaFloats.Length;
 
                 deviations.Set<float>(row, column, (float) deviation);
             }
@@ -177,13 +182,7 @@ public class PyramidFusion
             }
         }
 
-        var fusedRounded = new byte[height, width];
-        for (int i = 0; i < height; i++) {
-            for (int j = 0; j < width; j++) {
-                fusedRounded[i, j] = (byte)fused[i, j]; // No: convert, don't cast
-            }
-        }
-        var fusedMat = Mat.FromArray(fusedRounded);
+        var fusedMat = Mat.FromArray(fused);
 
         return fusedMat;
     }
@@ -211,16 +210,16 @@ public class PyramidFusion
     }
 
     public static Mat GetFusedLaplacianChannel(Mat[] laplacians, int channel) {
-        var regionEnergies = new Mat<float>[laplacians.Length];
+        var regionEnergies = new Mat[laplacians.Length];
 
         for (int layer = 0; layer < laplacians.Length; layer++) {
             var greyLap = laplacians[layer].ExtractChannel(channel);
-            regionEnergies[layer] = new Mat<float>(RegionEnergy(greyLap));
+            regionEnergies[layer] = RegionEnergy(greyLap);
         }
 
         (int width, int height) = laplacians[0].Size();
 
-        var indexers = regionEnergies.Select((regionEnergy) => regionEnergy.GetIndexer()).ToList();
+        var indexers = regionEnergies.Select((regionEnergy) => regionEnergy.GetGenericIndexer<float>()).ToList();
 
         var bestRE = new int[height, width];
         for (var y = 0; y < laplacians[0].Height; y++) {
@@ -241,14 +240,7 @@ public class PyramidFusion
             }
         }
 
-        var fusedRounded = new byte[height, width];
-        for (int i = 0; i < height; i++) {
-            for (int j = 0; j < width; j++) {
-                fusedRounded[i, j] = (byte)fused[i, j]; // No: convert, don't cast
-            }
-        }
-        var fusedMat = Mat.FromArray(fusedRounded);
-
+        var fusedMat = Mat.FromArray(fused);
         return fusedMat;
     }
 
