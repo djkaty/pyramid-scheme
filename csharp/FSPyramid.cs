@@ -105,21 +105,23 @@ public class PyramidFusion
         Mat deviations = new Mat(image.Size(), MatType.CV_32F);
 
         var avgQueue = new Queue<float>(kernelSize);
+        paddedImage.GetArray(out float[] areaArray);
+        (int width, int height) = paddedImage.Size();
+        var pixelWindowSize = kernelSize * kernelSize;
+
         for (int row = 0; row < image.Rows; row++)
         {
             var avgSum = 0f;
 
             for (int column = 0; column < image.Cols; column++)
             {
-                Mat area = paddedImage.SubMat(row, row + kernelSize, column, column + kernelSize);
-                area.GetArray(out float[] areaFloats);
                 if (column == 0) {
                     avgQueue.Clear();
-                    for (int i = 0; i < areaFloats.Length / kernelSize; i++) {
+                    for (int i = 0; i < kernelSize; i++) {
                         var a = 0f;
                         for (int j = 0; j < kernelSize; j++)
                         {
-                            a += areaFloats[i * kernelSize + j];
+                            a += areaArray[row * (width + i) + column + j];
                         }
                         avgSum += a;
                         avgQueue.Enqueue(a);
@@ -128,17 +130,20 @@ public class PyramidFusion
                     avgSum -= avgQueue.Dequeue();
                     var a = 0f;
                     for (int j = 0; j < kernelSize; j++) {
-                        a += areaFloats[(kernelSize - 1) * kernelSize + j];
+                        a += areaArray[row * (width + j) + column + kernelSize - 1];
                     }
                     avgSum += a;
                     avgQueue.Enqueue(a);
                 }
-                var average = avgSum / areaFloats.Length;
+                var average = avgSum / pixelWindowSize;
                 var sum = 0f;
-                for (int i = 0; i < areaFloats.Length; i++) {
-                    sum += (areaFloats[i] - average) * (areaFloats[i] - average);
+                for (int y = 0; y < kernelSize; y++) {
+                    for (int x = 0; x < kernelSize; x++)
+                    {
+                        sum += (areaArray[y * width + x] - average) * (areaArray[y * width + x] - average);
+                    }
                 }
-                var deviation = sum / areaFloats.Length;
+                var deviation = sum / pixelWindowSize;
 
                 deviations.Set(row, column, deviation);
             }
